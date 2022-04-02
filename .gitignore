@@ -87,3 +87,6 @@ venv.bak/
 #extra plots
 src/Pipelines/Examples/notebooks/*.png
 
+# Platform specific files.
+.DS_Store
+
