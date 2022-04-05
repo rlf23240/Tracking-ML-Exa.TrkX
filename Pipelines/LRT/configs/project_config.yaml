@@ -6,11 +6,11 @@ libraries:
 
 # The lines you would like/need in a batch script before the call to pipeline.py
 custom_batch_setup:
-    - conda activate HFS
+    - source activate $HOME/.conda/envs/HSF
     
 # If you need to set up some environment before a batch is submitted, define it here in order of commands to run
 command_line_setup:
-    - module load nersc-easybuild/.21.12 CUDA cudnn gcc python
+    - module load nersc-easybuild/.21.12 CUDA cudnn python
     
 # If you need to run jobs serially, set to true
 serial: False

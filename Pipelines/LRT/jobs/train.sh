@@ -5,7 +5,12 @@
 #SBATCH -c 10
 #SBATCH -G 1
 #SBATCH -A m3443_g
+#SBATCH --error=logs/%x-%j.err
+#SBATCH --output=logs/%x-%j.out
 
-conda activate HFS
+# Submit from Tracking-ML-Exa.TrkX/Pipelines/LRT
+# to ensure path is correct.
 
-srun -n 1 traintrack ../configs/pipelines/fulltrain.yaml
+source activate $HOME/.conda/envs/HSF
+
+srun -n 1 traintrack /configs/pipelines/fulltrain.yaml

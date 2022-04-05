@@ -38,8 +38,6 @@ class EmbeddingTelemetry(Callback):
         self.preds = []
         self.truth = []
         self.truth_graph = []
-        self.pt_true_pos = []
-        self.pt_true = []
         self.distances = []
 
         self.hparams = pl_module.hparams
@@ -54,11 +52,6 @@ class EmbeddingTelemetry(Callback):
 
         true_positives = outputs["preds"][:, outputs["truth"]]
         true = outputs["truth_graph"]
-
-        if "pt" in batch.__dict__.keys():
-            pts = batch.pt
-            self.pt_true_pos.append(pts[true_positives].cpu())
-            self.pt_true.append(pts[true].cpu())
 
         self.truth.append(outputs["truth"].cpu())
         self.distances.append(outputs["distances"].cpu())
@@ -78,25 +71,6 @@ class EmbeddingTelemetry(Callback):
         metrics_plots = self.plot_metrics(metrics)
 
         self.save_metrics(metrics_plots, pl_module.hparams.output_dir)
-
-    def get_pt_metrics(self):
-
-        pt_true_pos = np.concatenate(self.pt_true_pos, axis=1)
-        pt_true = np.concatenate(self.pt_true, axis=1)
-
-        pt_true_pos_av = (pt_true_pos[0] + pt_true_pos[1]) / 2
-        pt_true_av = (pt_true[0] + pt_true[1]) / 2
-
-        #         bins = np.arange(pl_module.hparams["pt_min"], np.ceil(pt_true_av.max()), 0.5)
-        #         bins = np.logspace(np.log(np.floor(pt_true_av.min())), np.log(np.ceil(pt_true_av.max())), 10)
-        bins = np.logspace(0, 1.5, 10)
-        centers = [(bins[i] + bins[i + 1]) / 2 for i in range(len(bins) - 1)]
-
-        tp_hist = np.histogram(pt_true_pos_av, bins=bins)[0]
-        t_hist = np.histogram(pt_true_av, bins=bins)[0]
-        ratio_hist = tp_hist / t_hist
-
-        return centers, ratio_hist
 
     def get_eff_pur_metrics(self):
 
@@ -121,12 +95,9 @@ class EmbeddingTelemetry(Callback):
 
     def calculate_metrics(self):
 
-        centers, ratio_hist = self.get_pt_metrics()
-
         eff, pur, r_cuts = self.get_eff_pur_metrics()
 
         return {
-            "pt_plot": {"centers": centers, "ratio_hist": ratio_hist},
             "eff_plot": {"eff": eff, "r_cuts": r_cuts},
             "pur_plot": {"pur": pur, "r_cuts": r_cuts},
         }
@@ -146,14 +117,6 @@ class EmbeddingTelemetry(Callback):
         return fig, axs
 
     def plot_metrics(self, metrics):
-
-        centers, ratio_hist = (
-            metrics["pt_plot"]["centers"],
-            metrics["pt_plot"]["ratio_hist"],
-        )
-        pt_fig, pt_axs = self.make_plot(
-            centers, ratio_hist, "pT (GeV)", "Efficiency", "Metric Learning Efficiency"
-        )
 
         eff_fig, eff_axs = self.make_plot(
             metrics["eff_plot"]["r_cuts"],
@@ -178,7 +141,6 @@ class EmbeddingTelemetry(Callback):
         )
 
         return {
-            "pt_plot": [pt_fig, pt_axs],
             "eff_plot": [eff_fig, eff_axs],
             "pur_plot": [pur_fig, pur_axs],
             "roc_plot": [roc_fig, roc_axs],
