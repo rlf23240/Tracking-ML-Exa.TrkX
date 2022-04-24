@@ -37,6 +37,7 @@ def load_dataset(
     num,
     pt_background_cut,
     pt_signal_cut,
+    eta_signal_cut,
     nhits,
     primary_only,
     true_edges,
@@ -57,6 +58,7 @@ def load_dataset(
             loaded_events,
             pt_background_cut,
             pt_signal_cut,
+            eta_signal_cut,
             nhits,
             primary_only,
             true_edges,
@@ -72,6 +74,7 @@ def split_datasets(
     train_split=[100, 10, 10],
     pt_background_cut=0,
     pt_signal_cut=0,
+    eta_signal_cut=4,
     nhits=0,
     primary_only=False,
     true_edges=None,
@@ -90,6 +93,7 @@ def split_datasets(
         sum(train_split),
         pt_background_cut,
         pt_signal_cut,
+        eta_signal_cut,
         nhits,
         primary_only,
         true_edges,
@@ -110,7 +114,7 @@ def get_edge_subset(edges, mask_where, inverse_mask):
 
 
 def select_data(
-    events, pt_background_cut, pt_signal_cut, nhits_min, primary_only, true_edges, noise
+    events, pt_background_cut, pt_signal_cut, eta_signal_cut, nhits_min, primary_only, true_edges, noise
 ):
     # Handle event in batched form
     if type(events) is not list:
@@ -148,6 +152,9 @@ def select_data(
             
         if "nhits" in event.keys:
             edge_subset &= ((event.primary[event[true_edges]].bool().all(0) | (not primary_only)))
+
+        if "eta" in event.keys:
+            edge_subset &= (event.eta[event[true_edges]].abs() <= eta_signal_cut).all(0)
         
         event.signal_true_edges = event.signal_true_edges[:, edge_subset]
 
