@@ -13,4 +13,4 @@
 
 source activate $HOME/.conda/envs/HSF
 
-srun traintrack configs/pipelines/fulltrain.yaml
+srun traintrack configs/pipelines/train_filter.yaml

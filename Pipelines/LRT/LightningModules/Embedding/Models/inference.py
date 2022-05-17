@@ -258,7 +258,11 @@ class EmbeddingBuilder(Callback):
 
         # Build the radius graph with radius < r_test
         e_spatial = build_edges(
-            spatial, spatial, indices=None, r_max=pl_module.hparams.r_test, k_max=1000
+            spatial, 
+            spatial, 
+            indices=None, 
+            r_max=0.3,
+            k_max=500
         )  # This step should remove reliance on r_val, and instead compute an r_build based on the EXACT r required to reach target eff/pur
 
         # Arbitrary ordering to remove half of the duplicate edges

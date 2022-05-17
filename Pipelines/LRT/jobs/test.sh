@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#SBATCH -t 0:01:00
+#SBATCH -t 00:10:00
+#SBATCH --nodes 1
 #SBATCH -C gpu
-#SBATCH -c 10
-#SBATCH -G 1
+#SBATCH --gpus-per-task=4
 #SBATCH -A m3443_g
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --output=logs/%x-%j.out
 
 source activate $HOME/.conda/envs/HSF
 
-srun -n 1 traintrack ./configs/pipelines/fulltrain_test.yaml
+srun traintrack ./configs/pipelines/fulltrain_test.yaml
 

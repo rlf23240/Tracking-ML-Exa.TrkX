@@ -12,9 +12,9 @@ import sklearn.metrics
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
-from tqdm import tqdm
 
-from ..utils import load_dataset, filter_dataset
+from sklearn.metrics import roc_auc_score, roc_curve
+from ..utils import load_dataset
 
 """
 Class-based Callback inference for integration with Lightning
@@ -85,8 +85,6 @@ class FilterTelemetry(Callback):
         eff = true_positives / self.truth.sum()
         pur = true_positives / positives
 
-        print("Eff vs. Pur:", list(zip(score_cuts, eff, pur)))
-
         return eff, pur, score_cuts
 
     def calculate_metrics(self):
@@ -96,6 +94,7 @@ class FilterTelemetry(Callback):
         return {
             "eff_plot": {"eff": eff, "score_cuts": score_cuts},
             "pur_plot": {"pur": pur, "score_cuts": score_cuts},
+            "roc_plot": {"eff": eff, "pur": pur},
         }
 
     def make_plot(self, x_val, y_val, x_lab, y_lab, title):
@@ -128,8 +127,19 @@ class FilterTelemetry(Callback):
             "Pur",
             "Purity vs. cut",
         )
+        roc_fig, roc_axs = self.make_plot(
+            metrics["roc_plot"]["pur"],
+            metrics["roc_plot"]["eff"],
+            "pur",
+            "eff",
+            "ROC Curve",
+        )
 
-        return {"eff_plot": [eff_fig, eff_axs], "pur_plot": [pur_fig, pur_axs]}
+        return {
+            "eff_plot": [eff_fig, eff_axs],
+            "pur_plot": [pur_fig, pur_axs],
+            "roc_plot": [roc_fig, roc_axs],
+        }
 
     def save_metrics(self, metrics_plots, output_dir):
 
@@ -223,28 +233,17 @@ class FilterBuilder(Callback):
             )[j]
             output = (
                 pl_module(
-                    torch.cat(
-                        [
-                            batch.cell_data[:, : pl_module.hparams["cell_channels"]],
-                            batch.x,
-                        ],
-                        axis=-1,
-                    ),
+                    torch.cat([batch.cell_data, batch.x], axis=-1),
                     batch.edge_index[:, subset_ind],
                     emb,
                 ).squeeze()
                 if ("ci" in pl_module.hparams["regime"])
                 else pl_module(batch.x, batch.edge_index[:, subset_ind], emb).squeeze()
             )
-
-            cut = F.sigmoid(output) > pl_module.hparams["edge_cut"]
+            cut = torch.sigmoid(output) > pl_module.hparams["filter_cut"]
             cut_list.append(cut)
 
         cut_list = torch.cat(cut_list)
-
-        edge_true = batch.y.sum()
-        edge_true_positive = (batch.y.bool() & cut_list).sum().float()
-        edge_positive = cut_list.sum().float()
 
         if "pid" not in pl_module.hparams["regime"]:
             batch.y = batch.y[cut_list]
@@ -252,19 +251,8 @@ class FilterBuilder(Callback):
         y_pid = batch.pid[batch.edge_index[0]] == batch.pid[batch.edge_index[1]]
         batch.y_pid = y_pid[cut_list]
         batch.edge_index = batch.edge_index[:, cut_list]
-        # batch = self.attach_pedigree(batch)
-        
-        if ("weights" in batch.__dict__.keys()) and (
-            batch.weights.shape == cut_list.shape
-        ):
+        if "weighting" in pl_module.hparams["regime"]:
             batch.weights = batch.weights[cut_list]
-
-        print(
-            "eff",
-            torch.tensor(edge_true_positive / edge_true),
-            "pur",
-            torch.tensor(edge_true_positive / edge_positive),
-        )
 
         self.save_downstream(batch, pl_module, datatype)
 
@@ -276,6 +264,7 @@ class FilterBuilder(Callback):
             torch.save(batch, pickle_file)
 
         logging.info("Saved event {}".format(batch.event_file[-4:]))
+
 
 class SingleFileFilterBuilder(FilterBuilder):
     def __init__(self):
@@ -292,7 +281,14 @@ class SingleFileFilterBuilder(FilterBuilder):
 
         single_file_split = [1, 1, 1]
         pl_module.trainset, pl_module.valset, pl_module.testset = [
-            load_dataset(input_dir, single_file_split[i])
+            load_dataset(
+                input_dir,
+                single_file_split[i],
+                pl_module.hparams["pt_background_min"],
+                pl_module.hparams["pt_signal_min"],
+                pl_module.hparams["true_edges"],
+                pl_module.hparams["noise"],
+            )
             for i, input_dir in enumerate(input_dirs)
         ]
 
@@ -313,8 +309,7 @@ class SingleFileFilterBuilder(FilterBuilder):
     def on_test_end(self, trainer, pl_module):
 
         print("Testing finished, running inference to build graphs...")
-        
-        self.checkpoint_dir = self.get_checkpoint_dir(trainer)
+
         datasets = self.prepare_datastructure(pl_module)
 
         total_length = sum([len(dataset) for dataset in datasets.values()])
@@ -323,7 +318,7 @@ class SingleFileFilterBuilder(FilterBuilder):
         with torch.no_grad():
             batch_incr = 0
             for set_idx, (datatype, dataset) in enumerate(datasets.items()):
-                for batch_idx, event_file in tqdm(enumerate(dataset)):
+                for batch_idx, event_file in enumerate(dataset):
                     percent = (batch_incr / total_length) * 100
                     sys.stdout.flush()
                     sys.stdout.write(f"{percent:.01f}% inference complete \r")
@@ -342,31 +337,7 @@ class SingleFileFilterBuilder(FilterBuilder):
                         self.construct_downstream(batch_to_save, pl_module, datatype)
 
                     batch_incr += 1
-                    
-    def get_checkpoint_dir(self, trainer):
-        
-        logger = trainer.logger
-        root_dir, project, run_id = logger._save_dir, logger._wandb_init["project"], logger._experiment._run_id
-        
-        return os.path.join(root_dir, project, run_id, "last.ckpt")
-    
-    def attach_pedigree(self, event):
-        
-        """Add the checkpoint information used in this building to the list of checkpoints in the event "pedigree". 
-        A pedigree is the full set of checkpoints that has led to this event.
-            
-        """
-        
-        if ("pedigree" in event.__dict__.keys()):
-            if isinstance(event.pedigree, list):
-                event.pedigree = event.pedigree + [self.checkpoint_dir]
-            elif isinstance(event.pedigree, str):
-                event.pedigree = [event.pedigree] + [self.checkpoint_dir]
-        else:
-            event.pedigree = [self.checkpoint_dir]
-            
-        return event
-    
+
     def prepare_datastructure(self, pl_module):
         # Prep the directory to produce inference data to
         self.output_dir = pl_module.hparams.output_dir

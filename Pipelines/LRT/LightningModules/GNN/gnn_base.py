@@ -36,6 +36,7 @@ class GNNBase(LightningModule):
                 self.hparams["datatype_split"][i],
                 self.hparams["pt_background_min"],
                 self.hparams["pt_signal_min"],
+                self.hparams["eta_signal_max"],
                 self.hparams["noise"],
             )
             for i, input_dir in enumerate(input_dirs)

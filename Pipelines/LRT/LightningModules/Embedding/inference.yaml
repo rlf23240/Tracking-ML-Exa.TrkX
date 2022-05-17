@@ -32,7 +32,13 @@ lr: 0.0001
 factor: 0.3
 patience: 10
 regime: [[rp, hnm]]
-max_epochs: 20
+max_epochs: 0
+
+# Inference
+# checkpoint_path: lightning_checkpoints/LRT_embedding/version_31/checkpoints/last.ckpt
+# resume_id: 31
+r_build: 0.3
+k_build: 500
 
 # Postprocessing
 callbacks: [[EmbeddingTelemetry, EmbeddingBuilder]]
