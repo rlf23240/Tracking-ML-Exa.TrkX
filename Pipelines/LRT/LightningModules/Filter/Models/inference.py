@@ -141,13 +141,11 @@ class FilterTelemetry(Callback):
 
 class FilterBuilder(Callback):
     """Callback handling filter inference for later stages.
-
     This callback is used to apply a trained filter model to the dataset of a LightningModule.
     The data structure is preloaded in the model, as training, validation and testing sets.
     Intended usage: run training and examine the telemetry to decide on the hyperparameters (e.g. r_test) that
     lead to desired efficiency-purity tradeoff. Then set these hyperparameters in the pipeline configuration and run
     with the --inference flag. Otherwise, to just run straight through automatically, train with this callback included.
-
     """
 
     def __init__(self):
@@ -277,6 +275,7 @@ class FilterBuilder(Callback):
 
         logging.info("Saved event {}".format(batch.event_file[-4:]))
 
+
 class SingleFileFilterBuilder(FilterBuilder):
     def __init__(self):
         super().__init__()
@@ -391,3 +390,4 @@ class SingleFileFilterBuilder(FilterBuilder):
         }
 
         return datasets
+

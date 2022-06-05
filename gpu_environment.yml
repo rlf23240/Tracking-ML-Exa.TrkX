@@ -1,4 +1,4 @@
-name: HSF
+name: HSF-pyg2
 
 channels:
     - rapidsai

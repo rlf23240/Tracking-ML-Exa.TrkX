@@ -16,7 +16,6 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-num_workers = 8
 
 # Local imports
 from .utils import graph_intersection, load_dataset, filter_dataset, LargeDataset
@@ -39,12 +38,27 @@ class FilterBase(LightningModule):
             for datatype in self.hparams["datatype_names"]
         ]
         
-        if "trainset" not in self.__dict__.keys():
-            self.trainset, self.valset, self.testset = [
-                load_dataset(input_dir, self.hparams["datatype_split"][i], **self.hparams)
-                for i, input_dir in enumerate(input_dirs)
-            ]
+        # if "trainset" not in self.__dict__.keys():
+        #     self.trainset, self.valset, self.testset = [
+        #         load_dataset(
+        #             input_dir, 
+        #             self.hparams["datatype_split"][i], 
+        #             **self.hparams
+        #         )
+        #         for i, input_dir in enumerate(input_dirs)
+        #     ]
             
+        # Temporary overwirte
+        datatype_split = [4000, 500, 500]
+        self.trainset, self.valset, self.testset = [
+            load_dataset(
+                input_dir, 
+                datatype_split,
+                **self.hparams
+            )
+            for i, input_dir in enumerate(input_dirs)
+        ]
+
         if (
             "logger" in self.__dict__.keys()
             and "_experiment" in self.logger.__dict__.keys()
@@ -55,19 +69,19 @@ class FilterBase(LightningModule):
     def train_dataloader(self):
         self.trainset = filter_dataset(self.trainset, self.hparams)
         if self.trainset is not None:
-            return DataLoader(self.trainset, batch_size=1, num_workers=num_workers)
+            return DataLoader(self.trainset, batch_size=1, num_workers=4)
         else:
             return None
 
     def val_dataloader(self):
         if self.valset is not None:
-            return GeoLoader(self.valset, batch_size=1, num_workers=num_workers)
+            return GeoLoader(self.valset, batch_size=1, num_workers=1)
         else:
             return None
 
     def test_dataloader(self):
         if self.testset is not None:
-            return GeoLoader(self.testset, batch_size=1, num_workers=num_workers)
+            return GeoLoader(self.testset, batch_size=1, num_workers=1)
         else:
             return None
 
@@ -165,7 +179,7 @@ class FilterBase(LightningModule):
 
         return eff, pur, auc
 
-    def shared_evaluation(self, batch, batch_idx, edge_cut, log=False):
+    def shared_evaluation(self, batch, batch_idx, log=False):
 
         """
         This method is shared between validation steps and test steps
@@ -218,7 +232,7 @@ class FilterBase(LightningModule):
                 )
 
         score_list = torch.cat(score_list)
-        cut_list = score_list > edge_cut
+        cut_list = score_list > self.hparams["edge_cut"]
 
         # Edge filter performance
         edge_positive = cut_list.sum().float()
@@ -243,13 +257,11 @@ class FilterBase(LightningModule):
                 }
             )
         
-        return {
-            "loss": val_loss, "preds": score_list, "truth": true_y
-        }
+        return {"loss": val_loss, "preds": score_list, "truth": true_y}
 
     def validation_step(self, batch, batch_idx):
 
-        outputs = self.shared_evaluation(batch, batch_idx, self.hparams['edge_cut'], log=True)
+        outputs = self.shared_evaluation(batch, batch_idx, log=True)
 
         return outputs["loss"]
 
@@ -257,7 +269,7 @@ class FilterBase(LightningModule):
         """
         Step to evaluate the model's performance
         """
-        outputs = self.shared_evaluation(batch, batch_idx, 0.25, log=False)
+        outputs = self.shared_evaluation(batch, batch_idx, log=False)
 
         return outputs
 
@@ -407,7 +419,7 @@ class FilterBaseBalanced(FilterBase):
 
     def validation_step(self, batch, batch_idx):
 
-        result = self.shared_evaluation(batch, batch_idx, self.hparams['edge_cut'], log=True)
+        result = self.shared_evaluation(batch, batch_idx, log=True)
         
 #         if str(self.device) == "cuda:0":
 #             result = self.shared_evaluation(batch, batch_idx, log=True)
@@ -418,11 +430,11 @@ class FilterBaseBalanced(FilterBase):
 
     def test_step(self, batch, batch_idx):
 
-        result = self.shared_evaluation(batch, batch_idx, self.hparams['edge_cut'], log=False)
+        result = self.shared_evaluation(batch, batch_idx, log=False)
 
         return result
 
-    def shared_evaluation(self, batch, batch_idx, edge_cut, log=False):
+    def shared_evaluation(self, batch, batch_idx, log=False):
 
         """
         This method is shared between validation steps and test steps
@@ -478,7 +490,7 @@ class FilterBaseBalanced(FilterBase):
                 )
 
         score_list = torch.cat(score_list)
-        cut_list = score_list > edge_cut
+        cut_list = score_list > self.hparams["edge_cut"]
 
         # Edge filter performance
         edge_positive = cut_list.sum().float()
@@ -519,11 +531,22 @@ class LargeFilterBaseBalanced(FilterBaseBalanced):
             for datatype in self.hparams["datatype_names"]
         ]
         
-        if "trainset" not in self.__dict__.keys():
-            self.trainset, self.valset, self.testset = [
-                LargeDataset(input_dir, self.hparams["datatype_split"][i], self.hparams)
-                for i, input_dir in enumerate(input_dirs)
-            ]
+        # if "trainset" not in self.__dict__.keys():
+        #     self.trainset, self.valset, self.testset = [
+        #         LargeDataset(input_dir, self.hparams["datatype_split"][i], self.hparams)
+        #         for i, input_dir in enumerate(input_dirs)
+        #     ]
+        
+        # Temporary overwirte
+        datatype_split = [4000, 500, 500]
+        self.trainset, self.valset, self.testset = [
+            LargeDataset(
+                input_dir, 
+                datatype_split[i],
+                self.hparams
+            )
+            for i, input_dir in enumerate(input_dirs)
+        ]
             
         # if (
         #     "logger" in self.__dict__.keys()
@@ -534,18 +557,18 @@ class LargeFilterBaseBalanced(FilterBaseBalanced):
         
     def train_dataloader(self):
         if self.trainset is not None:
-            return GeoLoader(self.trainset, batch_size=1, num_workers=num_workers)
+            return GeoLoader(self.trainset, batch_size=1, num_workers=2)
         else:
             return None
 
     def val_dataloader(self):
         if self.valset is not None:
-            return GeoLoader(self.valset, batch_size=1, num_workers=num_workers)
+            return GeoLoader(self.valset, batch_size=1, num_workers=0)
         else:
             return None
 
     def test_dataloader(self):
         if self.testset is not None:
-            return GeoLoader(self.testset, batch_size=1, num_workers=num_workers)
+            return GeoLoader(self.testset, batch_size=1, num_workers=0)
         else:
             return None

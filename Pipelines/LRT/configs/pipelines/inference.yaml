@@ -8,9 +8,9 @@ stage_list:
     # }
     - {
         set: Filter, 
-        name: VanillaFilter, 
+        name: PyramidFilter, 
         config: inference.yaml,  
-        resume_id: version_1_epoch12, 
+        resume_id: version_3, 
         batch_config: configs/batch_gpu_default.yaml
     }
     # - {

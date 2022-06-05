@@ -12,12 +12,13 @@ import torch
 
 def load_model(ckpt, device=None):
     from Filter.Models.vanilla_filter import VanillaFilter
+    from Filter.Models.pyramid_filter import PyramidFilter
     
     device = device or 'cuda'
     
     e_ckpt = torch.load(ckpt, map_location=device)
     e_config = e_ckpt['hyper_parameters']
-    e_model = VanillaFilter(e_config)
+    e_model = PyramidFilter(e_config)
     e_model.load_state_dict(e_ckpt["state_dict"])
     e_model.to(device)
     e_model.eval()
@@ -47,7 +48,7 @@ def test_model(model, edge_cuts, device=None):
         with torch.no_grad():
             batch = batch.to(device)
             eval_result = model.shared_evaluation(
-                batch, batch_idx, edge_cut=0.5
+                batch, batch_idx
             )
 
             for cut in edge_cuts:

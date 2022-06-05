@@ -6,7 +6,7 @@ libraries:
 
 # The lines you would like/need in a batch script before the call to pipeline.py
 custom_batch_setup:
-    - source activate $HOME/.conda/envs/HSF
+    - conda activate $HOME/.conda/envs/HSF
     
 # If you need to set up some environment before a batch is submitted, define it here in order of commands to run
 command_line_setup:
@@ -17,3 +17,4 @@ serial: False
 
 # Which logger to use - options are Weights & Biases [wandb], TensorBoard [tb], or [None]
 logger: tb
+

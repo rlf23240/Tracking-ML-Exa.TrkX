@@ -1,16 +1,15 @@
 # Input/output configuration
-input_dir: ${SCRATCH}/LRT/v3/pileup40/embedding_processed
+input_dir: ${SCRATCH}/LRT/v3/pileup40/embedding_processed_pyg2
 output_dir: ${SCRATCH}/LRT/v3/pileup40/filter_processed
 project: LRT_filter
-edge_cut: 0.05
+edge_cut: 0.2
 overwrite: True
 
 # Dataset parameters
 pt_background_min: 0.
 pt_signal_min: 1.
-eta_signal_max: 4.
 datatype_names: [[train, val, test]] # Which directory prefixes to use, assuming at least a train dataset 
-datatype_split: [[4000, 500, 500]] # Number of [training, validation, testing] examples
+datatype_split: [[1000, 10, 1]] # Number of [training, validation, testing] examples
 endcaps: True
 true_edges: layerless_true_edges
 noise: True
@@ -20,20 +19,21 @@ spatial_channels: 3
 cell_channels: 0
 hidden: 1024
 hidden_activation: Tanh
-nb_layer: 5
+nb_layer: 4
 emb_channels: 0
 layernorm: True
 batchnorm: False
-n_chunks: 12
+n_chunks: 2
 edges_per_batch: 3000000
 ratio: 8
 weight: 8
-warmup: 200
-lr: 0.000001
-factor: 0.3
-patience: 12
-regime: [[rp, hnm]]
-max_epochs: 100
+warmup: 10
+lr: 0.02
+factor: 0.7
+patience: 20
+regime: [[]]
+max_epochs: 500
 
 # Post-processing
-callbacks: [[FilterTelemetry, FilterBuilder]]
+callbacks: [[FilterBuilder, FilterTelemetry]]
+
