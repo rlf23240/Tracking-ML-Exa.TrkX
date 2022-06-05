@@ -2,14 +2,6 @@ import sys
 
 import torch.nn as nn
 from torch.nn import Linear
-from torch.nn.init import (
-    uniform_,
-    normal_,
-    xavier_uniform_,
-    xavier_normal_,
-    kaiming_uniform_,
-    kaiming_normal_,
-)
 import torch
 from torch_scatter import scatter_add, scatter_mean, scatter_max
 from torch.utils.checkpoint import checkpoint
@@ -37,12 +29,15 @@ class InteractionGNN(LargeGNNBase):
         hparams["batchnorm"] = (
             False if "batchnorm" not in hparams else hparams["batchnorm"]
         )
+        hparams["output_activation"] = (
+            None if "output_activation" not in hparams else hparams["output_activation"]
+        )
 
         # Setup input network
         self.node_encoder = make_mlp(
             hparams["spatial_channels"] + hparams["cell_channels"],
             [hparams["hidden"]] * hparams["nb_node_layer"],
-            output_activation=None,
+            output_activation=hparams["output_activation"],
             hidden_activation=hparams["hidden_activation"],
             layer_norm=hparams["layernorm"],
             batch_norm=hparams["batchnorm"],
@@ -54,7 +49,7 @@ class InteractionGNN(LargeGNNBase):
             [hparams["hidden"]] * hparams["nb_edge_layer"],
             layer_norm=hparams["layernorm"],
             batch_norm=hparams["batchnorm"],
-            output_activation=None,
+            output_activation=hparams["output_activation"],
             hidden_activation=hparams["hidden_activation"],
         )
 
@@ -64,7 +59,7 @@ class InteractionGNN(LargeGNNBase):
             [hparams["hidden"]] * hparams["nb_edge_layer"],
             layer_norm=hparams["layernorm"],
             batch_norm=hparams["batchnorm"],
-            output_activation=None,
+            output_activation=hparams["output_activation"],
             hidden_activation=hparams["hidden_activation"],
         )
 
@@ -74,7 +69,7 @@ class InteractionGNN(LargeGNNBase):
             [hparams["hidden"]] * hparams["nb_node_layer"],
             layer_norm=hparams["layernorm"],
             batch_norm=hparams["batchnorm"],
-            output_activation=None,
+            output_activation=hparams["output_activation"],
             hidden_activation=hparams["hidden_activation"],
         )
 
@@ -88,12 +83,6 @@ class InteractionGNN(LargeGNNBase):
             hidden_activation=hparams["hidden_activation"],
         )
 
-    def reset_parameters(self):
-
-        for layer in self.modules():
-            if type(layer) is Linear:
-                eval(self.hparams["initialization"])(layer.weight)
-                layer.bias.data.fill_(0)
 
     def message_step(self, x, start, end, e):
 
@@ -161,11 +150,9 @@ class InteractionGNN(LargeGNNBase):
         x = checkpoint(self.node_encoder, x)
         e = checkpoint(self.edge_encoder, torch.cat([x[start], x[end]], dim=1))
 
-        #         edge_outputs = []
         # Loop over iterations of edge and node networks
         for i in range(self.hparams["n_graph_iters"]):
 
             x, e = checkpoint(self.message_step, x, start, end, e)
 
-        # Compute final edge scores; use original edge directions only
-        return checkpoint(self.output_step, x, start, end, e)
+        return self.output_step(x, start, end, e)
